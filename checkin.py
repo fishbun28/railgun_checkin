@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from email.message import Message
 from pathlib import Path
 
 from browser import RailgunBrowser
@@ -13,24 +14,70 @@ from mail_client import QQMailClient
 
 
 LOCK_FILE = Path("checkin.lock")
-LOG_FILE = Path("logs") / f"checkin-{datetime.now():%Y-%m-%d}.log"
+
+CODE_REQUEST_DELAY = 5
+MAIL_MAX_ATTEMPTS = 12
+MAIL_POLL_INTERVAL = 5
+LOCK_TIMEOUT_SECONDS = 300
+
+
+def _read_lock_pid() -> str:
+    """Read the PID stored in the lock file, if possible."""
+    try:
+        return LOCK_FILE.read_text(encoding="utf-8").splitlines()[0]
+    except Exception:
+        return "unknown"
+
+
+def _read_lock_timestamp() -> datetime | None:
+    """Read the timestamp stored in the lock file, if possible."""
+    try:
+        text = LOCK_FILE.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        if len(lines) >= 2:
+            return datetime.fromisoformat(lines[1])
+    except Exception:
+        pass
+    return None
 
 
 def acquire_lock() -> bool:
-    """Create the lock file if it does not already exist.
+    """Create the lock file atomically if it does not already exist.
 
     Returns:
         True if the lock was acquired, False if another instance is running.
     """
     try:
-        if LOCK_FILE.exists():
-            pid = LOCK_FILE.read_text(encoding="utf-8").splitlines()[0]
-            print(f"Another instance is running (PID {pid}). Exiting.")
-            return False
-        LOCK_FILE.write_text(f"{os.getpid()}\n{str(sys.argv)}", encoding="utf-8")
+        with open(LOCK_FILE, "x", encoding="utf-8") as f:
+            f.write(f"{os.getpid()}\n{datetime.now().isoformat()}\n{str(sys.argv)}")
         return True
-    except Exception:
+    except FileExistsError:
+        timestamp = _read_lock_timestamp()
+        if timestamp is not None:
+            age = (datetime.now() - timestamp).total_seconds()
+            if age > LOCK_TIMEOUT_SECONDS:
+                logger = setup_logger("railgun-checkin", _log_file_path())
+                logger.warning(
+                    "Stale lock file detected (age %d seconds); removing and retrying.",
+                    int(age),
+                )
+                try:
+                    LOCK_FILE.unlink()
+                except OSError:
+                    pass
+                return acquire_lock()
+        pid = _read_lock_pid()
+        print(f"Another instance is running (PID {pid}). Exiting.")
         return False
+    except Exception as e:
+        logger = setup_logger("railgun-checkin", _log_file_path())
+        logger.error(f"Failed to acquire lock: {e}")
+        return False
+
+
+def _log_file_path() -> Path:
+    """Return the log file path based on the current date."""
+    return Path("logs") / f"checkin-{datetime.now():%Y-%m-%d}.log"
 
 
 def release_lock() -> None:
@@ -47,8 +94,9 @@ def run() -> int:
     Returns:
         0 on success, 1 on failure.
     """
+    LOG_FILE = _log_file_path()
 
-    def _subject_predicate(msg) -> bool:
+    def _subject_predicate(msg: Message) -> bool:
         """Return True if the email subject mentions railgun or verification code."""
         subject = (msg.get("Subject") or "").lower()
         return "railgun" in subject or "验证码" in subject
@@ -72,7 +120,7 @@ def run() -> int:
 
                 logger.info("Requesting verification code...")
                 browser.request_verification_code(cfg.railgun_email)
-                time.sleep(5)
+                time.sleep(CODE_REQUEST_DELAY)
 
                 logger.info("Reading verification code from QQ mail...")
                 client = QQMailClient(
@@ -82,14 +130,16 @@ def run() -> int:
                     cfg.imap_port,
                 )
                 code = client.find_code(
-                    predicate=_subject_predicate, max_attempts=12, interval=5
+                    predicate=_subject_predicate,
+                    max_attempts=MAIL_MAX_ATTEMPTS,
+                    interval=MAIL_POLL_INTERVAL,
                 )
                 if not code:
                     logger.error("Failed to find verification code in QQ Mail.")
                     browser.save_screenshot("02_no_code")
                     return 1
 
-                logger.info(f"Verification code retrieved: {code}")
+                logger.info("Verification code retrieved.")
                 logger.info("Submitting verification code...")
                 browser.submit_verification_code(code)
                 browser.save_screenshot("03_after_login")
