@@ -10,9 +10,11 @@ def setup_logger(name, log_file, level=logging.INFO):
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Clear existing handlers to avoid duplicate logs
+    # Close and remove existing handlers to avoid duplicate logs and fd leaks
     if logger.hasHandlers():
-        logger.handlers.clear()
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
 
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
