@@ -56,8 +56,12 @@ class RailgunBrowser:
         email_input = 'input[type="email"], input[name="email"], input[placeholder*="邮箱"]'
         send_button = 'button:has-text("发送"), button:has-text("验证码"), button:has-text("Send")'
 
-        self.page.locator(email_input).fill(email)
-        self.page.locator(send_button).click()
+        try:
+            self.page.locator(email_input).fill(email)
+            self.page.locator(send_button).click()
+        except PlaywrightTimeout:
+            self._screenshot("02_send_code_timeout.png")
+            raise RuntimeError("Request verification code timed out")
 
         self.page.wait_for_timeout(1000)
         if self._has_text(["失败", "错误", "error", "fail", "无效"]):
@@ -107,7 +111,7 @@ class RailgunBrowser:
         success = self._has_text(["成功", "已打卡", "checked in", "success"])
         failure = self._has_text(["失败", "error", "fail"])
         result = success and not failure
-        self._screenshot("03_checkin_result.png")
+        self._screenshot("05_checkin_result.png")
         return result
 
     def save_screenshot(self, name: str) -> Path:
