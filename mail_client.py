@@ -6,7 +6,7 @@ from email.message import Message
 from email import message_from_bytes
 
 
-CODE_PATTERN = re.compile(r"\b\d{4,6}\b")
+CODE_PATTERN = re.compile(r"(?<!\d)\d{4,6}(?!\d)")
 
 
 def extract_code(text: str) -> str | None:
@@ -36,16 +36,14 @@ def _decode_payload(msg: Message) -> str:
             return payload.decode(encoding)
         except (UnicodeDecodeError, LookupError):
             continue
-    return payload.decode("latin-1", errors="replace")
+    return payload.decode("utf-8", errors="replace")
 
 
 def get_text_from_email(msg: Message) -> str:
     """Recursively extract text content from a possibly multipart email."""
     if msg.is_multipart():
         parts = []
-        for part in msg.walk() if hasattr(msg, "walk") else []:
-            if part is msg:
-                continue
+        for part in msg.get_payload():
             text = get_text_from_email(part)
             if text:
                 parts.append(text)
