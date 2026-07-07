@@ -64,8 +64,8 @@ class RailgunBrowser:
 
     def request_verification_code(self, email: str) -> None:
         """在登录页输入邮箱并点击发送验证码。"""
-        email_input = 'input[type="email"], input[name="email"], input[placeholder*="邮箱"]'
-        send_button = 'button:has-text("发送"), button:has-text("验证码"), button:has-text("Send")'
+        email_input = 'input[type="email"], input[name="email"], input[placeholder*="邮箱"], input[placeholder*="email"]'
+        send_button = 'button:has-text("发送"), button:has-text("验证码"), button:has-text("Send"), button:has-text("Get Code")'
 
         try:
             self.page.locator(email_input).fill(email)
@@ -86,7 +86,7 @@ class RailgunBrowser:
 
     def submit_verification_code(self, code: str) -> None:
         """输入验证码并点击登录，然后校验是否真正登录成功。"""
-        code_input = 'input[type="text"], input[name="code"], input[placeholder*="验证码"]'
+        code_input = 'input[type="text"], input[name="code"], input[placeholder*="验证码"], input[placeholder*="code"], input[placeholder*="email"]'
         login_button = 'button:has-text("登录"), button:has-text("登入"), button:has-text("Login")'
 
         try:
