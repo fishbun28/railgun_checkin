@@ -1,5 +1,6 @@
 """Main orchestration for the Railgun auto-checkin flow."""
 
+import os
 import sys
 import time
 from datetime import datetime
@@ -23,10 +24,10 @@ def acquire_lock() -> bool:
     """
     try:
         if LOCK_FILE.exists():
-            existing_pid = LOCK_FILE.read_text(encoding="utf-8").strip() or "unknown"
-            print(f"Another instance is running (PID {existing_pid}). Exiting.")
+            pid = LOCK_FILE.read_text(encoding="utf-8").splitlines()[0]
+            print(f"Another instance is running (PID {pid}). Exiting.")
             return False
-        LOCK_FILE.write_text(str(sys.argv), encoding="utf-8")
+        LOCK_FILE.write_text(f"{os.getpid()}\n{str(sys.argv)}", encoding="utf-8")
         return True
     except Exception:
         return False
