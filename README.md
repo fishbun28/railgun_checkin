@@ -12,9 +12,11 @@
 
 1. 安装依赖：
    ```bash
-   uv sync
+   uv venv --python 3.12
+   uv pip install -r requirements.txt
+   uv run playwright install chromium
    ```
-   或：
+   或（没有 uv）：
    ```bash
    pip install -r requirements.txt
    playwright install chromium
@@ -48,17 +50,34 @@
 
 ## 配置说明
 
-| 变量 | 说明 |
-|------|------|
-| `RAILGUN_EMAIL` | 你在 railgun 注册的邮箱 |
-| `QQ_EMAIL` | 接收验证码的 QQ 邮箱 |
-| `QQ_AUTH_CODE` | QQ 邮箱 IMAP 授权码（不是登录密码） |
-| `RUN_TIME` | 每天自动打卡时间，默认 09:00 |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `RAILGUN_EMAIL` | 你在 railgun 注册的邮箱 | — |
+| `QQ_EMAIL` | 接收验证码的 QQ 邮箱 | — |
+| `QQ_AUTH_CODE` | QQ 邮箱 IMAP 授权码（不是登录密码） | — |
+| `RUN_TIME` | 每天自动打卡时间 | `09:00` |
+| `IMAP_SERVER` | QQ 邮箱 IMAP 服务器地址 | `imap.qq.com` |
+| `IMAP_PORT` | QQ 邮箱 IMAP 服务器端口 | `993` |
 
 ## 日志与截图
 
 - 日志：`logs/checkin-YYYY-MM-DD.log`
-- 截图：`screenshots/`
+- 截图：`screenshots/`，文件名为 `01_login_page_YYYYMMDD_HHMMSS_mmmmmm.png` 格式，带时间戳不会覆盖之前的运行结果
+- 并发锁：`checkin.lock`（防止多实例同时运行，5 分钟后自动过期）
+
+## 测试
+
+运行单元测试：
+
+```bash
+uv run pytest tests/ -v
+```
+
+## 故障排查
+
+- 如果提示 "Another instance is running"：检查是否有残留的 `checkin.lock` 文件，或等待 5 分钟后自动过期。
+- 如果收不到验证码：检查 QQ 邮箱 IMAP 授权码是否正确，以及邮件是否被归入垃圾箱。
+- 如果打卡失败：查看 `logs/` 日志和 `screenshots/` 截图。
 
 ## 计划任务管理
 
