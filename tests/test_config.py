@@ -8,12 +8,23 @@ def test_load_config_reads_env(monkeypatch):
     monkeypatch.setenv("QQ_EMAIL", "qq@qq.com")
     monkeypatch.setenv("QQ_AUTH_CODE", "auth123")
     monkeypatch.setenv("RUN_TIME", "10:00")
+    monkeypatch.setattr("config.load_dotenv", lambda *a, **k: None)
 
     cfg = load_config()
     assert cfg.railgun_email == "user@example.com"
     assert cfg.qq_email == "qq@qq.com"
     assert cfg.qq_auth_code == "auth123"
     assert cfg.run_time == "10:00"
+
+
+def test_load_config_custom_imap_port(monkeypatch):
+    monkeypatch.setenv("RAILGUN_EMAIL", "user@example.com")
+    monkeypatch.setenv("QQ_EMAIL", "qq@qq.com")
+    monkeypatch.setenv("QQ_AUTH_CODE", "auth123")
+    monkeypatch.setenv("IMAP_PORT", "995")
+    monkeypatch.setattr("config.load_dotenv", lambda *a, **k: None)
+    cfg = load_config()
+    assert cfg.imap_port == 995
 
 
 def test_load_config_defaults(monkeypatch):
