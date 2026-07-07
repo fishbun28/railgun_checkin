@@ -1,6 +1,5 @@
-import os
 import pytest
-from config import load_config, Config
+from config import load_config
 
 
 def test_load_config_reads_env(monkeypatch):
