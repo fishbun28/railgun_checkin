@@ -13,7 +13,12 @@ $venvPython = Join-Path $projectDir ".venv\Scripts\python.exe"
 if (Test-Path $venvPython) {
     $pythonExe = $venvPython
 } else {
-    $pythonExe = "python"
+    $cmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $pythonExe = $cmd.Source
+    } else {
+        throw "Python executable not found. Please install Python or create a .venv."
+    }
 }
 
 if (-not (Test-Path $pythonExe)) {
