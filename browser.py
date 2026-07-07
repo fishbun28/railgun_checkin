@@ -50,8 +50,17 @@ class RailgunBrowser:
         return any(text.lower() in content for text in texts)
 
     def open_login_page(self, url: str = "https://railgun.info/console/checkin") -> None:
-        """打开 railgun 页面；未登录时会自动重定向到登录页。"""
+        """打开 railgun 页面；如果当前是首页，先点击 Login 进入登录页。"""
         self.page.goto(url, wait_until="networkidle")
+
+        # Railgun 首页有 Register / Login 两个入口，需要先点击 Login。
+        login_button = 'button:has-text("Login"), button:has-text("登录"), a:has-text("Login"), a:has-text("登录")'
+        try:
+            self.page.locator(login_button).first.click(timeout=5_000)
+            self.page.wait_for_load_state("networkidle")
+        except PlaywrightTimeout:
+            # 已经在登录页或没有 Login 按钮，继续后续流程。
+            pass
 
     def request_verification_code(self, email: str) -> None:
         """在登录页输入邮箱并点击发送验证码。"""
