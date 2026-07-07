@@ -12,7 +12,7 @@ from mail_client import QQMailClient
 
 
 LOCK_FILE = Path("checkin.lock")
-LOG_FILE = Path("logs") / f"checkin-{datetime.now().strftime('%Y-%m-%d')}.log"
+LOG_FILE = Path("logs") / f"checkin-{datetime.now():%Y-%m-%d}.log"
 
 
 def acquire_lock() -> bool:
