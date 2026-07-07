@@ -110,7 +110,7 @@ class RailgunBrowser:
 
     def click_checkin(self, timeout: int = 30_000) -> bool:
         """点击打卡按钮。返回是否成功。"""
-        checkin_button = 'button:has-text("打卡"), button:has-text("Check In"), a:has-text("打卡")'
+        checkin_button = 'button:has-text("打卡"), button:has-text("签到"), button:has-text("Check In"), a:has-text("打卡"), a:has-text("签到")'
 
         try:
             self.page.locator(checkin_button).first.click(timeout=timeout)
