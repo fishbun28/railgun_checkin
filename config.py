@@ -24,9 +24,8 @@ def load_config(env_path: str | None = None) -> Config:
 
     Args:
         env_path: Optional path to a .env file. If provided, variables from that
-            file are loaded into the environment. If omitted, no .env file is
-            loaded by this function (callers may still rely on already-loaded
-            environment variables).
+            file are loaded into the environment. If omitted, the default `.env`
+            file in the current working directory is loaded.
 
     Returns:
         A populated Config instance.
@@ -35,7 +34,9 @@ def load_config(env_path: str | None = None) -> Config:
         ValueError: If any required environment variable is missing.
     """
     if env_path is not None:
-        load_dotenv(dotenv_path=Path(env_path), override=True)
+        load_dotenv(Path(env_path), override=True)
+    else:
+        load_dotenv()
 
     required_vars = ["RAILGUN_EMAIL", "QQ_EMAIL", "QQ_AUTH_CODE"]
     missing = [var for var in required_vars if not getenv(var)]
