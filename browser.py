@@ -59,6 +59,11 @@ class RailgunBrowser:
         self.page.locator(email_input).fill(email)
         self.page.locator(send_button).click()
 
+        self.page.wait_for_timeout(1000)
+        if self._has_text(["失败", "错误", "error", "fail", "无效"]):
+            self._screenshot("02_send_code_failed.png")
+            raise RuntimeError("Failed to request verification code")
+
     def is_login_page(self) -> bool:
         """Return True if the current URL indicates we are still on a login page."""
         url = self.page.url.lower()
@@ -69,9 +74,14 @@ class RailgunBrowser:
         code_input = 'input[type="text"], input[name="code"], input[placeholder*="验证码"]'
         login_button = 'button:has-text("登录"), button:has-text("登入"), button:has-text("Login")'
 
-        self.page.locator(code_input).fill(code)
-        self.page.locator(login_button).click()
-        self.page.wait_for_load_state("networkidle")
+        try:
+            self.page.locator(code_input).fill(code)
+            self.page.locator(login_button).click()
+            self.page.wait_for_load_state("networkidle")
+        except PlaywrightTimeout:
+            self._screenshot("03_login_submit_timeout.png")
+            raise RuntimeError("Login submit timed out")
+
         self.page.wait_for_timeout(1000)
 
         if self.is_login_page():
@@ -96,7 +106,7 @@ class RailgunBrowser:
 
         success = self._has_text(["成功", "已打卡", "checked in", "success"])
         failure = self._has_text(["失败", "error", "fail"])
-        result = success or not failure
+        result = success and not failure
         self._screenshot("03_checkin_result.png")
         return result
 
