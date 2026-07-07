@@ -17,6 +17,7 @@ def test_load_config_reads_env(monkeypatch):
 
 
 def test_load_config_defaults(monkeypatch):
+    monkeypatch.setattr("config.load_dotenv", lambda *a, **k: None)
     monkeypatch.delenv("RUN_TIME", raising=False)
     monkeypatch.delenv("IMAP_SERVER", raising=False)
     monkeypatch.delenv("IMAP_PORT", raising=False)
@@ -31,6 +32,7 @@ def test_load_config_defaults(monkeypatch):
 
 
 def test_load_config_missing_raises(monkeypatch):
+    monkeypatch.setattr("config.load_dotenv", lambda *a, **k: None)
     monkeypatch.delenv("RAILGUN_EMAIL", raising=False)
     monkeypatch.delenv("QQ_EMAIL", raising=False)
     monkeypatch.delenv("QQ_AUTH_CODE", raising=False)
@@ -40,6 +42,17 @@ def test_load_config_missing_raises(monkeypatch):
     assert "RAILGUN_EMAIL" in message
     assert "QQ_EMAIL" in message
     assert "QQ_AUTH_CODE" in message
+
+
+def test_load_config_invalid_imap_port(monkeypatch):
+    monkeypatch.setattr("config.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv("RAILGUN_EMAIL", "user@example.com")
+    monkeypatch.setenv("QQ_EMAIL", "qq@qq.com")
+    monkeypatch.setenv("QQ_AUTH_CODE", "auth123")
+    monkeypatch.setenv("IMAP_PORT", "not-a-number")
+
+    with pytest.raises(ValueError, match="IMAP_PORT must be an integer, got: 'not-a-number'"):
+        load_config()
 
 
 def test_load_config_from_env_file(tmp_path, monkeypatch):

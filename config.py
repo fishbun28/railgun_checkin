@@ -39,15 +39,22 @@ def load_config(env_path: str | None = None) -> Config:
         load_dotenv()
 
     required_vars = ["RAILGUN_EMAIL", "QQ_EMAIL", "QQ_AUTH_CODE"]
-    missing = [var for var in required_vars if not getenv(var)]
+    values = {var: getenv(var) for var in required_vars}
+    missing = [var for var in required_vars if not values[var]]
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
+    port_val = getenv("IMAP_PORT", "993")
+    try:
+        imap_port = int(port_val)
+    except ValueError:
+        raise ValueError(f"IMAP_PORT must be an integer, got: {port_val!r}")
+
     return Config(
-        railgun_email=getenv("RAILGUN_EMAIL", ""),
-        qq_email=getenv("QQ_EMAIL", ""),
-        qq_auth_code=getenv("QQ_AUTH_CODE", ""),
+        railgun_email=values["RAILGUN_EMAIL"],
+        qq_email=values["QQ_EMAIL"],
+        qq_auth_code=values["QQ_AUTH_CODE"],
         run_time=getenv("RUN_TIME", "09:00"),
         imap_server=getenv("IMAP_SERVER", "imap.qq.com"),
-        imap_port=int(getenv("IMAP_PORT", "993")),
+        imap_port=imap_port,
     )
