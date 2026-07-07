@@ -21,10 +21,15 @@ def acquire_lock() -> bool:
     Returns:
         True if the lock was acquired, False if another instance is running.
     """
-    if LOCK_FILE.exists():
+    try:
+        if LOCK_FILE.exists():
+            existing_pid = LOCK_FILE.read_text(encoding="utf-8").strip() or "unknown"
+            print(f"Another instance is running (PID {existing_pid}). Exiting.")
+            return False
+        LOCK_FILE.write_text(str(sys.argv), encoding="utf-8")
+        return True
+    except Exception:
         return False
-    LOCK_FILE.write_text(str(datetime.now().isoformat()), encoding="utf-8")
-    return True
 
 
 def release_lock() -> None:
@@ -35,18 +40,18 @@ def release_lock() -> None:
         pass
 
 
-def _subject_predicate(msg) -> bool:
-    """Return True if the email subject mentions railgun or verification code."""
-    subject = (msg.get("Subject") or "").lower()
-    return "railgun" in subject or "验证码" in subject
-
-
 def run() -> int:
     """Run the full checkin flow.
 
     Returns:
         0 on success, 1 on failure.
     """
+
+    def _subject_predicate(msg) -> bool:
+        """Return True if the email subject mentions railgun or verification code."""
+        subject = (msg.get("Subject") or "").lower()
+        return "railgun" in subject or "验证码" in subject
+
     logger = setup_logger("railgun-checkin", LOG_FILE)
 
     if not acquire_lock():
@@ -56,38 +61,49 @@ def run() -> int:
     browser = None
     try:
         cfg = load_config()
+        logger.info("Configuration loaded.")
 
         with RailgunBrowser() as browser:
             try:
+                logger.info("Opening login page...")
                 browser.open_login_page()
                 browser.save_screenshot("01_login_page")
 
+                logger.info("Requesting verification code...")
                 browser.request_verification_code(cfg.railgun_email)
                 time.sleep(5)
 
+                logger.info("Reading verification code from QQ mail...")
                 client = QQMailClient(
                     cfg.qq_email,
                     cfg.qq_auth_code,
                     cfg.imap_server,
                     cfg.imap_port,
                 )
-                code = client.find_code(predicate=_subject_predicate)
+                code = client.find_code(
+                    predicate=_subject_predicate, max_attempts=12, interval=5
+                )
                 if not code:
                     logger.error("Failed to find verification code in QQ Mail.")
                     browser.save_screenshot("02_no_code")
                     return 1
 
+                logger.info(f"Verification code retrieved: {code}")
+                logger.info("Submitting verification code...")
                 browser.submit_verification_code(code)
+                browser.save_screenshot("03_after_login")
 
+                logger.info("Navigating to checkin page...")
                 browser.ensure_checkin_page()
                 browser.save_screenshot("04_checkin_page")
 
+                logger.info("Clicking checkin button...")
                 if not browser.click_checkin():
                     logger.error("Checkin failed after clicking the button.")
                     browser.save_screenshot("05_checkin_failed")
                     return 1
 
-                logger.info("Checkin completed successfully.")
+                logger.info("Checkin succeeded.")
                 browser.save_screenshot("05_checkin_success")
                 return 0
 
