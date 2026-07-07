@@ -1,5 +1,6 @@
 """Browser automation for Railgun checkin using Playwright."""
 
+from datetime import datetime
 from pathlib import Path
 
 from playwright.sync_api import Playwright, sync_playwright, TimeoutError as PlaywrightTimeout
@@ -38,7 +39,8 @@ class RailgunBrowser:
     def _screenshot(self, name: str) -> Path:
         """Save a screenshot to *screenshot_dir* and return the saved path."""
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
-        path = self.screenshot_dir / name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        path = self.screenshot_dir / f"{name.rsplit('.', 1)[0]}_{timestamp}.png"
         self.page.screenshot(path=str(path))
         return path
 
@@ -60,12 +62,12 @@ class RailgunBrowser:
             self.page.locator(email_input).fill(email)
             self.page.locator(send_button).click()
         except PlaywrightTimeout:
-            self._screenshot("02_send_code_timeout.png")
+            self._screenshot("02_send_code_timeout")
             raise RuntimeError("Request verification code timed out")
 
         self.page.wait_for_timeout(1000)
         if self._has_text(["失败", "错误", "error", "fail", "无效"]):
-            self._screenshot("02_send_code_failed.png")
+            self._screenshot("02_send_code_failed")
             raise RuntimeError("Failed to request verification code")
 
     def is_login_page(self) -> bool:
@@ -83,13 +85,13 @@ class RailgunBrowser:
             self.page.locator(login_button).click()
             self.page.wait_for_load_state("networkidle")
         except PlaywrightTimeout:
-            self._screenshot("03_login_submit_timeout.png")
+            self._screenshot("03_login_submit_timeout")
             raise RuntimeError("Login submit timed out")
 
         self.page.wait_for_timeout(1000)
 
         if self.is_login_page():
-            self._screenshot("04_login_failed.png")
+            self._screenshot("04_login_failed")
             raise RuntimeError("Login failed: still on login page")
 
     def ensure_checkin_page(self, url: str = "https://railgun.info/console/checkin") -> None:
@@ -105,13 +107,13 @@ class RailgunBrowser:
             self.page.locator(checkin_button).first.click(timeout=timeout)
             self.page.wait_for_load_state("networkidle")
         except PlaywrightTimeout:
-            self._screenshot("checkin_button_not_found.png")
-            return False
+            self._screenshot("checkin_button_not_found")
+            raise RuntimeError("Checkin button not found or click timed out")
 
         success = self._has_text(["成功", "已打卡", "checked in", "success"])
         failure = self._has_text(["失败", "error", "fail"])
         result = success and not failure
-        self._screenshot("05_checkin_result.png")
+        self._screenshot("05_checkin_result")
         return result
 
     def save_screenshot(self, name: str) -> Path:
