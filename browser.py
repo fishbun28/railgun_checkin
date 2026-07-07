@@ -24,13 +24,15 @@ class RailgunBrowser:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._context:
+            self._context.close()
+            self._context = None
         if self._browser:
             self._browser.close()
             self._browser = None
         if self._playwright:
             self._playwright.stop()
             self._playwright = None
-        self._context = None
         self.page = None
 
     def _screenshot(self, name: str) -> Path:
@@ -39,6 +41,11 @@ class RailgunBrowser:
         path = self.screenshot_dir / name
         self.page.screenshot(path=str(path))
         return path
+
+    def _has_text(self, texts: list[str]) -> bool:
+        """Return True if any of *texts* appears in the page (case-insensitive)."""
+        content = self.page.content().lower()
+        return any(text.lower() in content for text in texts)
 
     def open_login_page(self, url: str = "https://railgun.info/console/checkin") -> None:
         """打开 railgun 页面；未登录时会自动重定向到登录页。"""
@@ -52,18 +59,28 @@ class RailgunBrowser:
         self.page.locator(email_input).fill(email)
         self.page.locator(send_button).click()
 
+    def is_login_page(self) -> bool:
+        """Return True if the current URL indicates we are still on a login page."""
+        url = self.page.url.lower()
+        return "login" in url or "signin" in url
+
     def submit_verification_code(self, code: str) -> None:
-        """输入验证码并点击登录。"""
+        """输入验证码并点击登录，然后校验是否真正登录成功。"""
         code_input = 'input[type="text"], input[name="code"], input[placeholder*="验证码"]'
         login_button = 'button:has-text("登录"), button:has-text("登入"), button:has-text("Login")'
 
         self.page.locator(code_input).fill(code)
         self.page.locator(login_button).click()
         self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_timeout(1000)
+
+        if self.is_login_page():
+            self._screenshot("04_login_failed.png")
+            raise RuntimeError("Login failed: still on login page")
 
     def ensure_checkin_page(self, url: str = "https://railgun.info/console/checkin") -> None:
         """确保当前页面是打卡页，如果不是则导航过去。"""
-        if self.page.url != url:
+        if not self.page.url.startswith(url):
             self.page.goto(url, wait_until="networkidle")
 
     def click_checkin(self, timeout: int = 30_000) -> bool:
@@ -73,10 +90,15 @@ class RailgunBrowser:
         try:
             self.page.locator(checkin_button).first.click(timeout=timeout)
             self.page.wait_for_load_state("networkidle")
-            return True
         except PlaywrightTimeout:
             self._screenshot("checkin_button_not_found.png")
             return False
+
+        success = self._has_text(["成功", "已打卡", "checked in", "success"])
+        failure = self._has_text(["失败", "error", "fail"])
+        result = success or not failure
+        self._screenshot("03_checkin_result.png")
+        return result
 
     def save_screenshot(self, name: str) -> Path:
         """Save a screenshot with the given *name* and return the saved path."""
