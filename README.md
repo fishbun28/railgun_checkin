@@ -78,8 +78,14 @@ uv run pytest tests/ -v
 - 如果提示 "Another instance is running"：检查是否有残留的 `checkin.lock` 文件，或等待 5 分钟后自动过期。
 - 如果收不到验证码：检查 QQ 邮箱 IMAP 授权码是否正确，以及邮件是否被归入垃圾箱。
 - 如果打卡失败：查看 `logs/` 日志和 `screenshots/` 截图。
+- 如果日志出现 `Could not reach the login form`、`Login button not found`、`Checkin button not found`：说明站点改版、按钮文案或结构变了。`browser.py` 顶部的选择器常量（`SUBMIT_BUTTON`、`CHECKIN_BUTTON_GROUPS` 等）已同时兼容中英文多种文案（Login / Sign in / 登录 / 签到 …），此时把新文案补进去即可，不需要重写流程。
+- 页面文案是英文还是中文不影响运行；结果判定同时匹配「今日已签到」「今天已打卡」「already checked in」等提示。
 
 ## 计划任务管理
 
+以下命令都需要**管理员权限**的 PowerShell：
+
 - 查看任务：`Get-ScheduledTask -TaskName RailgunAutoCheckin`
+- 临时停用：`Disable-ScheduledTask -TaskName RailgunAutoCheckin`
+- 重新启用：`Enable-ScheduledTask -TaskName RailgunAutoCheckin`
 - 删除任务：`Unregister-ScheduledTask -TaskName RailgunAutoCheckin -Confirm:$false`
